@@ -1,0 +1,58 @@
+modelVersion: 2.0
+docker-images:
+  - jfrog: releases-docker.jfrog.io/jfrog/jfrog-cli-v2
+
+properties:
+  - image-registry: armdocker.rnd.ericsson.se
+
+env:
+  - PWD
+  - DOCKER_NETWORK (default=--network host)
+  - HOME
+  - HELM_ARTIFACT_DAYS_OLD
+  - SELI_ARTIFACTORY_REPO_USER
+  - SELI_ARTIFACTORY_REPO_PASS
+
+rules:
+
+  search-ci-internal-helm:
+    - task: fetch-image
+      docker-image: jfrog
+      docker-flags:
+        - "--volume ${env.PWD}:${env.PWD}"
+        - "--volume ${env.HOME}:${env.HOME}"
+        - ${env.DOCKER_NETWORK}
+        - "--env HOME=${env.HOME}"
+        - "--env SELI_ARTIFACTORY_REPO_USER=${env.SELI_ARTIFACTORY_REPO_USER}"
+        - "--env SELI_ARTIFACTORY_REPO_PASS=${env.SELI_ARTIFACTORY_REPO_PASS}"
+      cmd:
+      - |-
+        echo '''{
+          "files":[
+            {
+              "aql":{
+                "items.find":{
+                  "repo":"proj-eric-oss-ci-internal-helm-local",
+                  "type":"file",
+                  "created":{
+                    "$before":"${env.HELM_ARTIFACT_DAYS_OLD}d"
+                  }
+                }
+              }
+            }
+          ]
+        }''' > spec.json
+      - cat spec.json
+      #- jfrog rt s --url=https://arm.seli.gic.ericsson.se/artifactory --user=${env.SELI_ARTIFACTORY_REPO_USER} --password=${env.SELI_ARTIFACTORY_REPO_PASS} --spec spec.json
+
+  delete:
+    - task: fetch-image
+      docker-image: jfrog
+      docker-flags:
+        - "--volume ${env.PWD}:${env.PWD}"
+        - "--volume ${env.HOME}:${env.HOME}"
+        - ${env.DOCKER_NETWORK}
+        - "--env HOME=${env.HOME}"
+        - "--env SELI_ARTIFACTORY_REPO_USER=${env.SELI_ARTIFACTORY_REPO_USER}"
+        - "--env SELI_ARTIFACTORY_REPO_PASS=${env.SELI_ARTIFACTORY_REPO_PASS}"
+      cmd: jfrog rt del --url=https://arm.seli.gic.ericsson.se/artifactory --user=${env.SELI_ARTIFACTORY_REPO_USER} --password=${env.SELI_ARTIFACTORY_REPO_PASS} --spec spec.json
